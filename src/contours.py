@@ -55,7 +55,9 @@ def get_contours(
     # Step 4: Draw contours on the black image
     for contour in contours:
         contour_length = cv2.arcLength(contour, True)
-        if contour_length > MIN_CONTOUR_ARC_LENGTH:  # Only draw sufficiently large contours
+        if (
+            contour_length > MIN_CONTOUR_ARC_LENGTH
+        ):  # Only draw sufficiently large contours
             cv2.drawContours(contour_image, [contour], -1, 255, 2)
 
     logger.info(f"Contours detected: {len(contours)}")

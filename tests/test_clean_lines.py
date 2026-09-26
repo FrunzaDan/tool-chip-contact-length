@@ -44,4 +44,3 @@ def test_empty_input_returns_empty_array_with_expected_shape():
     cleaned = clean_lines(hough_lines)
 
     assert cleaned.shape == (0, 4)
-

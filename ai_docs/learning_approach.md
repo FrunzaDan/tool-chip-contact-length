@@ -22,11 +22,11 @@ When a new session starts and someone asks about the code:
 
 4. Read the relevant concept doc if it exists before exploring source
 
-## What I cannot do
+## Running things
 
-- Build or run any project (Linux dev container, Windows target)
+- If the environment allows it, run `python3 -m pytest` from the repo root, or the app via `./run.sh` (see `dev_environment.md`)
 
-- If build/test output is needed → ask the user to run and paste results
+- If it doesn't (no shell, no dataset in `Input/`), ask the user to run and paste results
 
 ## Teaching protocol
 

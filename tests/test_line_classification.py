@@ -56,9 +56,7 @@ def test_get_vertical_line_y_index_skips_lines_that_are_too_slanted():
     contour_image = _blank_image(height=100, width=100)
     # dx is at the exclusive threshold, so this must be rejected even though
     # it satisfies the position thresholds.
-    cleaned_lines = np.array(
-        [[70, 20, 70 + VERTICAL_LINE_MAX_DX, 90]], dtype=np.int32
-    )
+    cleaned_lines = np.array([[70, 20, 70 + VERTICAL_LINE_MAX_DX, 90]], dtype=np.int32)
 
     result = get_vertical_line_y_index(cleaned_lines, contour_image, image)
 

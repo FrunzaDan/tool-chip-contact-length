@@ -48,7 +48,9 @@ def _resize_to_fit(
     new_height = max(1, round(src_height * scale))
     resized = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
 
-    canvas = np.full((target_height, target_width, 3), PANEL_BACKGROUND_COLOR, dtype=np.uint8)
+    canvas = np.full(
+        (target_height, target_width, 3), PANEL_BACKGROUND_COLOR, dtype=np.uint8
+    )
     x_offset = (target_width - new_width) // 2
     y_offset = (target_height - new_height) // 2
     canvas[y_offset : y_offset + new_height, x_offset : x_offset + new_width] = resized

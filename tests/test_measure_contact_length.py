@@ -34,7 +34,9 @@ def _patch_pipeline(monkeypatch, *, horizontal_y, vertical_y):
 
 
 def _run(monkeypatch, caplog, *, horizontal_y, vertical_y):
-    saved = _patch_pipeline(monkeypatch, horizontal_y=horizontal_y, vertical_y=vertical_y)
+    saved = _patch_pipeline(
+        monkeypatch, horizontal_y=horizontal_y, vertical_y=vertical_y
+    )
     contour_image = np.zeros((20, 20), dtype=np.uint8)
     original_image = np.zeros((20, 20, 3), dtype=np.uint8)
 
