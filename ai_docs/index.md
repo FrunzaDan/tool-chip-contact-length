@@ -25,13 +25,13 @@ pyproject.toml            PEP 621 dependency manifest (OpenCV, NumPy) — no bui
 
 src/
   main.py             Entry point — starts the batch run and top-level error handling
-  folderLoop.py        Iterates over the input folder, calls processImage for each .bmp file
-  processImage.py       The per-image pipeline: resize -> crop -> threshold -> morphology -> edges -> Hough lines -> plot
-  getContours.py        Blur + Canny + contour filtering, used to clean up the dilated mask before Hough
-  getHoughLines.py       Hough line detection, line cleanup/classification, contact-length calculation, result image saving
+  folder_loop.py        Iterates over the input folder, calls process_image for each .bmp file
+  process_image.py      The per-image pipeline: resize -> crop -> threshold -> morphology -> edges -> Hough lines -> plot
+  contours.py           Blur + Canny + contour filtering, used to clean up the dilated mask before Hough
+  hough_lines.py        Hough line detection, line cleanup/classification, contact-length calculation, result image saving
   plot.py               Saves the 6-panel diagnostic figure for each image
-  randomColor.py        Small helper: random BGR color for annotations
-  logging_config.py     Rotating file + console logger setup
+  random_color.py       Small helper: random BGR color for annotations
+  logging_config.py     configure_logging(): rotating file + console handlers on the root logger
 
 Input/Complete_Dataset/   Source .bmp images (one per high-speed camera frame)
 Output/folder_hough_results/   Annotated result images (one per input image, .bmp)
@@ -62,7 +62,7 @@ Either way, put the `.bmp` frames to analyze in `Input/Complete_Dataset/` first.
 
 ## Step-by-step pipeline
 
-Each image goes through the same sequence of steps, implemented in `processImage.py`. Every step is wrapped in its own try/except so a failure on one image is logged and skipped without stopping the batch (`folderLoop.py` also catches per-image exceptions for the same reason).
+Each image goes through the same sequence of steps, implemented in `process_image.py`. Every step is wrapped in its own try/except so a failure on one image is logged and skipped without stopping the batch (`folder_loop.py` also catches per-image exceptions for the same reason).
 
 ### 1. Read
 
@@ -120,7 +120,7 @@ A 3×3 kernel with 8 iterations of `cv2.dilate` grows the white regions further,
 |---|
 | ![Dilation](../Documentation/Images/Dilation.png) |
 
-### 8. Contours / Canny edges (`getContours.py`)
+### 8. Contours / Canny edges (`contours.py`)
 
 *In plain terms: trace the outline of the solid white blob as a clean line, and throw away any tiny stray outlines that are just leftover noise.*
 
@@ -134,13 +134,13 @@ On the dilated mask:
 |---|
 | ![Canny](../Documentation/Images/Canny.png) |
 
-### 9. Hough line detection (`getHoughLines.py`)
+### 9. Hough line detection (`hough_lines.py`)
 
 *In plain terms: this is the "measuring" step — find the two straight edges that matter (the flat workpiece/chip edge and the tool's edge), mark the key point on each, and subtract to get the contact length.*
 
 This is where the actual measurement happens.
 
-1. **Line detection** — the contour image is grayscaled, blurred, and passed through the probabilistic Hough transform (`cv2.HoughLinesP`) to get a set of candidate straight line segments. `HoughLinesP` returns `None` (not an empty list) when it finds no lines at all; that case is handled explicitly — the frame is skipped with a warning instead of crashing.
+1. **Line detection** — the single-channel contour image is blurred and passed through the probabilistic Hough transform (`cv2.HoughLinesP`) to get a set of candidate straight line segments. `HoughLinesP` returns `None` (not an empty list) when it finds no lines at all; that case is handled explicitly — the frame is skipped with a warning instead of crashing.
 2. **Line cleanup** (`clean_lines`) — lines are grouped by angle; lines whose angle is within 4.5° of an already-kept line are treated as duplicates and discarded. This collapses many overlapping detections down to a handful of distinct lines.
 
    | Hough lines (raw) | Cleaned lines |
@@ -148,8 +148,8 @@ This is where the actual measurement happens.
    | ![Hough_Lines](../Documentation/Images/Hough_Lines.png) | ![Cleaned_Lines](../Documentation/Images/Cleaned_Lines.png) |
 
 3. **Classification** — from the cleaned lines, the code looks for:
-   - A **horizontal** line (`get_horizontal_line_Y_index`): near-flat (`|y1 - y2| < 10`), representing the visible top of the workpiece/chip edge.
-   - A **vertical** line (`get_vertical_line_Y_index`): near-vertical (`|x1 - x2| < 4`), positioned in the right half of the frame, representing the tool's contact edge.
+   - A **horizontal** line (`get_horizontal_line_y_index`): near-flat (`|y1 - y2| < 10`), representing the visible top of the workpiece/chip edge.
+   - A **vertical** line (`get_vertical_line_y_index`): near-vertical (`|x1 - x2| < 4`), positioned in the right half of the frame, representing the tool's contact edge.
 
    For each, the lowest point (largest y) on the line is taken as the reference point, marked with a circle and its Y coordinate printed on the image.
 
@@ -181,7 +181,7 @@ The grid is composited directly with OpenCV (resize-to-fit + tile + `cv2.putText
 
 ## Logging
 
-`logging_config.py` sets up a logger that writes to both the console and a rotating log file (`Logs/TCCL_process_<timestamp>.log`, 10 MB per file, 5 backups). Every step of the pipeline logs its progress or errors, so a full run can be audited after the fact without re-running it. When the app is launched via `run.sh`, that script additionally writes its own `Logs/run_<timestamp>.log` covering the setup steps (Python/dependency checks) and a copy of the app's console output.
+Each module logs through its own `logging.getLogger(__name__)`; `main.py` calls `logging_config.configure_logging()` once at startup, which attaches handlers to the root logger that write to both the console and a rotating log file (`Logs/TCCL_process_<timestamp>.log`, 10 MB per file, 5 backups). Every step of the pipeline logs its progress or errors, so a full run can be audited after the fact without re-running it. When the app is launched via `run.sh`, that script additionally writes its own `Logs/run_<timestamp>.log` covering the setup steps (Python/dependency checks) and a copy of the app's console output.
 
 ## Error handling philosophy
 

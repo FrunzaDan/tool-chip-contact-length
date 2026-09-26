@@ -1,17 +1,19 @@
-import traceback
-import folderLoop
-from logging_config import logger
+import logging
+
+import folder_loop
+from logging_config import configure_logging
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
     """Main function to start folder processing."""
+    configure_logging()
     logger.info("Start!")
     try:
-        # Calling the folder loop function
-        folderLoop.loop_folder_function()
-    except Exception as e:
-        logger.error(f"An error occurred: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        folder_loop.process_folder()
+    except Exception:
+        logger.exception("An error occurred")
     else:
         logger.info("Folder processing completed successfully.")
     finally:
@@ -20,5 +22,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-else:
-    logger.info("Module imported. Run from import.")

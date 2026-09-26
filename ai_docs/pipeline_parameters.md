@@ -6,17 +6,17 @@ Every magic-number knob that controls how an image is processed, gathered in one
 
 ## Key files / paths
 
-- `src/processImage.py` — resize/threshold/morphology constants, top of file
-- `src/getContours.py` — blur + contour-filtering constants
-- `src/getHoughLines.py` — Hough + line-classification constants
+- `src/process_image.py` — resize/threshold/morphology constants, top of file
+- `src/contours.py` — blur + contour-filtering constants
+- `src/hough_lines.py` — Hough + line-classification constants
 
 ## How it works
 
 - `RESIZE_WIDTH = 1080` — every image is resized to this width (height scaled proportionally) before anything else, so all the pixel-based thresholds below assume this scale.
-- `OTSU_THRESHOLD_LOW/HIGH = 5, 255` — passed to `cv2.threshold(..., THRESH_BINARY + THRESH_OTSU)`; OTSU picks the actual cutoff, these are just the output binarization values.
+- `OTSU_MAX_VALUE = 255` — passed to `cv2.threshold(image, 0, OTSU_MAX_VALUE, THRESH_BINARY | THRESH_OTSU)`; OTSU picks the actual cutoff (the `0` threshold argument is ignored), this is the value given to foreground pixels.
 - `MORPH_CLOSE_KERNEL_SIZE = (4,4)`, `MORPH_CLOSE_ITERATIONS = 10` — closes small holes/speckles inside the bright mask.
 - `DILATION_KERNEL_SIZE = (3,3)`, `DILATION_ITERATIONS = 8` — grows the mask further to seal remaining gaps before contour extraction.
-- `CONTOUR_BLUR_KERNEL_SIZE = (9,9)`, `CONTOUR_BLUR_SIGMA = 1` — Gaussian blur applied before Canny, in `getContours.py`.
+- `CONTOUR_BLUR_KERNEL_SIZE = (9,9)`, `CONTOUR_BLUR_SIGMA = 1` — Gaussian blur applied before Canny, in `contours.py`.
 - `CANNY_THRESHOLD_1/2 = 100, 200`, `CANNY_APERTURE_SIZE = 3` — passed to `cv2.Canny`.
 - `MIN_CONTOUR_ARC_LENGTH = 500` — contours shorter than this (px) are discarded as noise.
 - `HOUGH_VOTES_THRESHOLD = 90`, `HOUGH_MIN_LINE_LENGTH = 90`, `HOUGH_MAX_LINE_GAP = 80` — passed to `cv2.HoughLinesP`.

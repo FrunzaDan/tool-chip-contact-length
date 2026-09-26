@@ -1,8 +1,8 @@
-from randomColor import MAX_VALUE, MIN_VALUE, color_line
+from random_color import MAX_CHANNEL_VALUE, MIN_CHANNEL_VALUE, random_line_color
 
 
-def test_color_line_channels_are_within_configured_range():
+def test_random_line_color_channels_are_within_configured_range():
     for _ in range(50):
-        red, green, blue = color_line()
-        for channel in (red, green, blue):
-            assert MIN_VALUE <= channel <= MAX_VALUE
+        blue, green, red = random_line_color()
+        for channel in (blue, green, red):
+            assert MIN_CHANNEL_VALUE <= channel <= MAX_CHANNEL_VALUE

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from getContours import MIN_CONTOUR_ARC_LENGTH, get_contours
+from contours import MIN_CONTOUR_ARC_LENGTH, get_contours
 
 
 def test_raises_on_none_input():
@@ -17,7 +17,7 @@ def test_draws_a_sufficiently_large_contour():
 
     result = get_contours(image, 100, 200, 3)
 
-    assert result.shape == (300, 300, 3)
+    assert result.shape == (300, 300)
     assert np.any(result != 0)
 
 

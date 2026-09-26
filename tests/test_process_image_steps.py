@@ -1,7 +1,7 @@
 import numpy as np
 
-import processImage
-from processImage import (
+import process_image
+from process_image import (
     RESIZE_WIDTH,
     _STEP_FAILED,
     _apply_dilation,
@@ -67,14 +67,14 @@ def test_apply_morphological_closing_fills_small_gap(monkeypatch):
     # exact pixel positions rather than to the closing behavior itself. Use a
     # small, deterministic kernel/iteration count to test that behavior in
     # isolation: a small hole surrounded by foreground gets filled in.
-    monkeypatch.setattr(processImage, "MORPH_CLOSE_KERNEL_SIZE", (3, 3))
-    monkeypatch.setattr(processImage, "MORPH_CLOSE_ITERATIONS", 1)
+    monkeypatch.setattr(process_image, "MORPH_CLOSE_KERNEL_SIZE", (3, 3))
+    monkeypatch.setattr(process_image, "MORPH_CLOSE_ITERATIONS", 1)
 
     image = np.zeros((50, 50), dtype=np.uint8)
     image[20:30, 20:30] = 255
     image[24:26, 24:26] = 0  # small hole inside the filled square
 
-    closed = processImage._apply_morphological_closing(image)
+    closed = process_image._apply_morphological_closing(image)
 
     assert closed[25, 25] == 255
 

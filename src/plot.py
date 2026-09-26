@@ -1,8 +1,13 @@
+import logging
 import os
+
 import cv2
 import numpy as np
-import folderLoop
-from logging_config import logger
+import numpy.typing as npt
+
+import folder_loop
+
+logger = logging.getLogger(__name__)
 
 # Layout of the 2x3 diagnostic grid image.
 GRID_ROWS = 2
@@ -25,7 +30,7 @@ SUPTITLE_FONT_SCALE = 0.9
 SUPTITLE_FONT_THICKNESS = 2
 
 
-def _to_bgr(image: cv2.typing.MatLike) -> cv2.typing.MatLike:
+def _to_bgr(image: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
     """Ensure image has 3 channels so it can be composited into a color grid."""
     if image.ndim == 2 or (image.ndim == 3 and image.shape[2] == 1):
         return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
@@ -33,8 +38,8 @@ def _to_bgr(image: cv2.typing.MatLike) -> cv2.typing.MatLike:
 
 
 def _resize_to_fit(
-    image: cv2.typing.MatLike, target_width: int, target_height: int
-) -> cv2.typing.MatLike:
+    image: npt.NDArray[np.uint8], target_width: int, target_height: int
+) -> npt.NDArray[np.uint8]:
     """Resize image to fit within (target_width, target_height) preserving its
     aspect ratio, centered on a white canvas of exactly that size (letterboxed)."""
     src_height, src_width = image.shape[:2]
@@ -50,7 +55,7 @@ def _resize_to_fit(
     return canvas
 
 
-def _make_panel(image: cv2.typing.MatLike, title: str) -> cv2.typing.MatLike:
+def _make_panel(image: npt.NDArray[np.uint8], title: str) -> npt.NDArray[np.uint8]:
     """Build one grid cell: a title bar over the aspect-preserved, letterboxed image."""
     panel = np.full(
         (CELL_TITLE_HEIGHT + CELL_CONTENT_HEIGHT, CELL_CONTENT_WIDTH, 3),
@@ -73,13 +78,13 @@ def _make_panel(image: cv2.typing.MatLike, title: str) -> cv2.typing.MatLike:
 
 
 def save_entire_process_plot(
-    current_resize_image_plot,
-    otsu_thresholded_image,
-    morph_closed_image,
-    dilated_image,
-    canny_edges_image,
-    hough_image_plot,
-    current_image_name,
+    resized_image: npt.NDArray[np.uint8],
+    otsu_thresholded_image: npt.NDArray[np.uint8],
+    morph_closed_image: npt.NDArray[np.uint8],
+    dilated_image: npt.NDArray[np.uint8],
+    contour_image: npt.NDArray[np.uint8],
+    hough_image_plot: npt.NDArray[np.uint8],
+    image_name: str,
 ) -> None:
     """
     Build a 2x3 diagnostic grid of the pipeline's intermediate images and save
@@ -93,11 +98,11 @@ def save_entire_process_plot(
     the time.
     """
     images_and_titles = [
-        (current_resize_image_plot, "Original"),
+        (resized_image, "Original"),
         (otsu_thresholded_image, "OTSU BINARY"),
         (morph_closed_image, "MORPH CLOSING: 4x4"),
         (dilated_image, "DILATION: 3x3"),
-        (canny_edges_image, "CANNY"),
+        (contour_image, "CANNY"),
         (hough_image_plot, "HOUGH LINES"),
     ]
 
@@ -110,7 +115,7 @@ def save_entire_process_plot(
 
     cv2.putText(
         canvas,
-        current_image_name,
+        image_name,
         (MARGIN, SUPTITLE_HEIGHT - 12),
         TITLE_FONT,
         SUPTITLE_FONT_SCALE,
@@ -125,16 +130,16 @@ def save_entire_process_plot(
         x = MARGIN + col * (panel_width + MARGIN)
         canvas[y : y + panel_height, x : x + panel_width] = panel
 
-    image_base_name, _ = os.path.splitext(current_image_name)
-    output_folder_path = os.path.join(
-        folderLoop.output_plot_results_folder, f"{image_base_name}.png"
+    image_base_name, _ = os.path.splitext(image_name)
+    output_path = os.path.join(
+        folder_loop.OUTPUT_PLOT_RESULTS_FOLDER, f"{image_base_name}.png"
     )
 
     try:
-        success = cv2.imwrite(output_folder_path, canvas)
+        success = cv2.imwrite(output_path, canvas)
         if success:
-            logger.info(f"Saved plot image: {output_folder_path}")
+            logger.info(f"Saved plot image: {output_path}")
         else:
-            logger.error(f"Failed to save plot image: {output_folder_path}")
+            logger.error(f"Failed to save plot image: {output_path}")
     except Exception as e:
-        logger.error(f"Error saving plot image for {current_image_name}: {e}")
+        logger.error(f"Error saving plot image for {image_name}: {e}")
