@@ -160,6 +160,8 @@ cython_debug/
 #.idea/
 
 #custom for this project
+.DS_Store
+.ruff_cache/
 Output/folder_hough_results/*.bmp
 Output/folder_plot_results/*.png
 Input/

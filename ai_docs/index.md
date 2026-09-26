@@ -21,10 +21,10 @@ See `Documentation/Diagrams/TCCL_General_Flow.jpeg` for the original flow diagra
 
 ```
 run.sh                  Convenience script: finds Python, checks/installs deps, runs the app, logs everything
-pyproject.toml          PEP 621 manifest: deps (OpenCV, NumPy), `dev` extra (pytest), pytest config — no build-system, the app runs as scripts
+pyproject.toml          PEP 621 manifest: deps (OpenCV, NumPy), `dev` extra (pytest, ruff, mypy), tool config — no build-system, the app runs as scripts
 
 src/
-  main.py               Entry point: configure_logging(), then folder_loop.process_folder(), top-level error handling
+  main.py               Entry point: configure_logging(), then folder_loop.process_folder(); returns exit code 0/1
   folder_loop.py        process_folder(): iterates the input folder (sorted), calls process_image for each .bmp; owns the folder-path constants
   process_image.py      process_image(): the per-image pipeline — read -> resize -> crop -> grayscale -> Otsu -> closing -> dilation -> contours -> Hough/measure -> plot
   contours.py           get_contours(): blur + Canny + contour filtering, returns a single-channel contour image for the Hough step
@@ -36,7 +36,7 @@ src/
 tests/                  pytest unit tests (hough_lines, contours, process_image helpers, random_color)
 ai_docs/                This documentation
 Documentation/          Flow diagram, per-step example images (used below), original write-up (PDF/TCCL.pages)
-.vscode/                Debug config + install/clean/format tasks
+.vscode/                Debug config, install/clean/lint/type-check/test tasks, Ruff as formatter
 
 Input/Complete_Dataset/        Source .bmp images (one per high-speed camera frame) — git-ignored, not in the repo
 Output/folder_hough_results/   Annotated result images (same name as input, .bmp) — only for frames where both lines were found
@@ -64,11 +64,11 @@ Logs/                          run_<timestamp>.log (from run.sh) and TCCL_proces
 
 Either way, put the `.bmp` frames to analyze in `Input/Complete_Dataset/` first (the folder is git-ignored, so a fresh clone has no dataset). Files are processed in sorted name order. Results appear in `Output/folder_hough_results/` and `Output/folder_plot_results/` (both created automatically if missing); a new log file is created in `Logs/` for each run.
 
-**Tests:** `python3 -m pytest` from the repo root (needs `pytest`; e.g. `pip install -e '.[dev]'` or just `pip install pytest`). See [dev_environment.md](dev_environment.md).
+**Development:** `pip install -e '.[dev]'`. Checks (run manually, or via the VS Code tasks): `pytest`, `ruff check .`, `ruff format .`, `mypy`. See [dev_environment.md](dev_environment.md).
 
 ## Step-by-step pipeline
 
-Each image goes through the same sequence of steps, implemented in `process_image.process_image(image_path, image_name)`. Every step runs through `_run_step(step_name, image_name, func, ...)`, which catches any exception, logs `"<step> Error at <image>: <error>"`, and returns the `_STEP_FAILED` sentinel; the pipeline then stops for that image and the batch moves on (`folder_loop.py` also catches per-image exceptions for the same reason). A sentinel is used instead of `None` because a step may legitimately return `None` (the plot step does).
+Each image goes through the same sequence of steps, implemented in `process_image.process_image(image_path)` (a `pathlib.Path`; the image name is `image_path.name`). Every step runs through `_run_step(step_name, image_name, func, *args)`, which catches any exception, logs `"<step> Error at <image>"` with the traceback (`logger.exception`), and returns the `_STEP_FAILED` sentinel; the pipeline then stops for that image and the batch moves on (`folder_loop.py` also catches per-image exceptions for the same reason). A sentinel is used instead of `None` because a step may legitimately return `None` (the plot step does). The sentinel is an `Enum` member and `_run_step` is typed with `ParamSpec`/`TypeVar`, so after each `if result is _STEP_FAILED: return` mypy knows `result` is the step's real return type.
 
 ### 1. Read
 
@@ -132,7 +132,7 @@ A 3×3 kernel with 8 iterations of `cv2.dilate` grows the white regions further,
 
 `get_contours(dilated_image, CANNY_THRESHOLD_1, CANNY_THRESHOLD_2, CANNY_APERTURE_SIZE)`, on the dilated mask:
 1. A Gaussian blur (9×9, sigma 1) smooths the shape boundary.
-2. `cv2.Canny` (100 / 200, aperture 3) extracts edges from the blurred mask.
+2. `cv2.Canny` (100 / 200, `apertureSize=3`) extracts edges from the blurred mask. The aperture must be passed by keyword: Canny's 4th positional parameter is the `edges` output buffer. (It used to be passed positionally, so `CANNY_APERTURE_SIZE` was silently ignored; results were unaffected only because OpenCV's default aperture is also 3.)
 3. `cv2.findContours` (`RETR_EXTERNAL`, `CHAIN_APPROX_NONE`) finds the external contours in the edge map.
 4. Only contours with arc length > 500 px are redrawn (white, thickness 2) onto a black **single-channel** image — this discards small noise contours and keeps just the main tool/chip outline. That single-channel `contour_image` is what the Hough step consumes.
 
@@ -169,6 +169,8 @@ Entry point: `measure_contact_length(contour_image, cropped_image, 90, 90, 80, i
    contact_length = y_point_of_horizontal - y_point_of_vertical
    ```
 
+   This is only the part of the contact length that is visible in the image. The full contact length is `contact_length + t`, where `t` is the **cutting depth** between the tool and the material: a constant of the cutting setup that can't be computed from the image by the OpenCV processing. That's why the result image is labeled `Dist = <n>px + t` — `t` is added outside this program.
+
    A result `<= 0` logs a "result is suspect" warning (likely line misclassification) but is still saved.
 
    The diagram below illustrates the geometry: `a` and `b` are distances from the top of the frame to the horizontal and vertical reference points respectively, `c` is the vertical line's extent, and `d = a - c` is the resulting contact length.
@@ -177,7 +179,7 @@ Entry point: `measure_contact_length(contour_image, cropped_image, 90, 90, 80, i
    |---|
    | ![Blueprint](../Documentation/Images/Blueprint.png) |
 
-5. **Result image** — the two lines and their labeled points are drawn on the cropped original image, along with a `Dist = <n>px + t` text annotation (the `+ t` is a stray literal, see [known_gaps.md](known_gaps.md)), and saved to `Output/folder_hough_results/<image_name>`. The annotations are drawn directly onto the cropped image (a mutation, by design).
+5. **Result image** — the two lines and their labeled points are drawn on the cropped original image, along with a `Dist = <n>px + t` text annotation, and saved to `Output/folder_hough_results/<image_name>`. The annotations are drawn directly onto the cropped image (a mutation, by design).
 
    | Overlay result |
    |---|
@@ -187,23 +189,23 @@ If either the horizontal or vertical line can't be found, a warning is logged an
 
 ### 10. Diagnostic plot (`plot.py`)
 
-`save_entire_process_plot(...)` assembles a 2×3 diagnostic grid — `Original` (the resized full frame, not the crop) / `OTSU BINARY` / `MORPH CLOSING: 4x4` / `DILATION: 3x3` / `CANNY` (actually the filtered contour image; title kept to match `Documentation/Images/Canny.png`) / `HOUGH LINES` — under the image name as a title, and saves it to `Output/folder_plot_results/<image_base_name>.png` for visual QA of the whole pipeline on that frame.
+`save_entire_process_plot(...)` assembles a 2×3 diagnostic grid — `Original` (the resized full frame, not the crop) / `OTSU BINARY` / `MORPH CLOSING: 4x4` / `DILATION: 3x3` / `CANNY` (actually the filtered contour image; title kept to match `Documentation/Images/Canny.png`) / `HOUGH LINES` — under the image name as a title — each panel's image framed by a thin (1 px) black border, and the raw Hough lines drawn in red — and saves it to `Output/folder_plot_results/<image_base_name>.png` for visual QA of the whole pipeline on that frame.
 
 The grid is composited directly with OpenCV (resize-to-fit + tile + `cv2.putText` titles) rather than Matplotlib: profiling showed Matplotlib's `savefig()` alone accounted for ~94% of total per-image processing time, since this is plain image tiling with plain titles, not an actual data plot. The OpenCV version produces the same 6-panel layout (each panel's aspect ratio preserved via letterboxing) in roughly a quarter of the time — around a 3-4x speedup for the whole pipeline in practice.
 
 ## Logging
 
-Each module logs through its own `logging.getLogger(__name__)`; `main()` calls `logging_config.configure_logging()` once at startup, which sets the root logger to INFO, clears any existing handlers, and attaches a console handler plus a rotating file handler (`Logs/TCCL_process_<timestamp>.log`, 10 MB per file, 5 backups; format `time - LEVEL - message`, without the module name). Nothing is configured at import time, so importing modules (e.g. from tests) doesn't create log files. Every step of the pipeline logs its progress or errors, so a full run can be audited after the fact without re-running it. When the app is launched via `run.sh`, that script additionally writes its own `Logs/run_<timestamp>.log` covering the setup steps (Python/dependency checks) and a copy of the app's console output.
+Each module logs through its own `logging.getLogger(__name__)`; `main()` calls `logging_config.configure_logging()` once at startup, which sets the root logger to INFO, clears any existing handlers, and attaches a console handler plus a rotating file handler (`Logs/TCCL_process_<timestamp>.log`, 10 MB per file, 5 backups; format `time - module - LEVEL - message`). Log calls use lazy `%`-style arguments (`logger.info("Saved %s", path)`), not f-strings, so messages are only formatted if emitted. Nothing is configured at import time, so importing modules (e.g. from tests) doesn't create log files. Every step of the pipeline logs its progress or errors, so a full run can be audited after the fact without re-running it. When the app is launched via `run.sh`, that script additionally writes its own `Logs/run_<timestamp>.log` covering the setup steps (Python/dependency checks) and a copy of the app's console output.
 
 ## Error handling philosophy
 
-Every image is processed independently: an exception at any pipeline step (read, resize, crop, threshold, morphology, contour extraction, Hough detection, or plotting) is caught with a broad `except Exception` in `_run_step` (not just OpenCV-specific errors, since real failures often surface as plain Python exceptions rather than `cv2.error`) and logged with the step and image name. Anything escaping `process_image` is caught in `folder_loop.process_folder` and `main()` via `logger.exception` (with traceback), and the loop moves on to the next image. A single malformed or unusual frame never aborts the whole batch.
+Every image is processed independently: an exception at any pipeline step (read, resize, crop, threshold, morphology, contour extraction, Hough detection, or plotting) is caught with a broad `except Exception` in `_run_step` (not just OpenCV-specific errors, since real failures often surface as plain Python exceptions rather than `cv2.error`) and logged with the step, image name, and traceback. Anything escaping `process_image` is caught in `folder_loop.process_folder` and `main()` via `logger.exception` (with traceback), and the loop moves on to the next image. A single malformed or unusual frame never aborts the whole batch. Only a failure of the batch itself (e.g. missing input folder) makes `main()` return exit code 1.
 
 "Soft" failures — unreadable file (`cv2.imread` → `None`), no Hough lines, horizontal/vertical line not found, non-positive length — are logged as errors/warnings rather than raised.
 
 ## Cross-platform notes
 
-- All file paths are built with `os.path.join` (no hardcoded `/` or `\`), so the app runs unmodified on Windows, Linux, and macOS.
+- All file paths are `pathlib.Path` objects built with `/` (the right separator is used per platform), so the app runs unmodified on Windows, Linux, and macOS. They're converted with `str()` only where passed to `cv2.imread`/`cv2.imwrite`.
 - The `Output/folder_hough_results/` and `Output/folder_plot_results/` folders are created automatically when `folder_loop` is imported, and `Logs/` when logging is configured.
 - Hidden/system files such as macOS's `.DS_Store` are skipped quietly (logged at info level) rather than being flagged as an unexpected non-BMP file. Subdirectories are skipped too.
 - The `.bmp` extension check is case-sensitive: `*.BMP` files are skipped with a warning.

@@ -7,4 +7,4 @@ The general flow of this image processing software is the following:
 
 Run it with `./run.sh`. See [ai_docs/index.md](ai_docs/index.md) for full documentation: project layout, the step-by-step image-processing pipeline, and manual run instructions.
 
-Run the test suite with `pip install -e .[dev]` then `pytest`.
+For development: `pip install -e '.[dev]'`. Checks: `pytest`, `ruff check .`, `ruff format .`, `mypy` — see [ai_docs/dev_environment.md](ai_docs/dev_environment.md).

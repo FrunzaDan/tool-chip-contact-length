@@ -1,6 +1,8 @@
+"""Hough line detection, line classification, and contact-length measurement."""
+
 import logging
 import math
-import os
+from typing import cast
 
 import cv2
 import numpy as np
@@ -23,6 +25,9 @@ MARKER_THICKNESS = 2
 FONT_SCALE = 1.2
 FONT_THICKNESS = 3
 
+# Color (BGR) of the raw Hough lines on the diagnostic plot's last panel.
+HOUGH_PLOT_LINE_COLOR = (0, 0, 255)  # red
+
 
 def measure_contact_length(
     contour_image: npt.NDArray[np.uint8],
@@ -32,8 +37,10 @@ def measure_contact_length(
     max_line_gap: int,
     image_name: str,
 ) -> npt.NDArray[np.uint8]:
-    """Detect the tool's vertical edge and the chip's horizontal edge in
-    contour_image, and save original_image annotated with the contact length
+    """Measure the tool-chip contact length and save the annotated result.
+
+    Detects the tool's vertical edge and the chip's horizontal edge in
+    contour_image, and saves original_image annotated with the contact length
     (the vertical distance between them).
 
     Returns a 3-channel image of all the raw Hough lines, for the diagnostic plot.
@@ -53,8 +60,8 @@ def measure_contact_length(
     )
     if hough_lines is None:
         logger.warning(
-            f"No Hough lines detected for {image_name}; "
-            "skipping contact-length calculation."
+            "No Hough lines detected for %s; skipping contact-length calculation.",
+            image_name,
         )
         return hough_image_plot
 
@@ -82,15 +89,16 @@ def measure_contact_length(
 
             if contact_length <= 0:
                 logger.warning(
-                    f"{image_name}: computed contact length is "
-                    f"non-positive ({contact_length}px) - likely horizontal/"
-                    "vertical line misclassification, result is suspect."
+                    "%s: computed contact length is non-positive (%dpx) - likely "
+                    "horizontal/vertical line misclassification, result is suspect.",
+                    image_name,
+                    contact_length,
                 )
 
             save_result_image(image_name, annotated_image, contact_length)
 
     except cv2.error as error:
-        logger.warning(f"Not computable! OpenCV error: {error}")
+        logger.warning("Not computable! OpenCV error: %s", error)
 
     return hough_image_plot
 
@@ -102,27 +110,30 @@ def detect_hough_lines(
     max_line_gap: int,
     hough_image_plot: npt.NDArray[np.uint8],
 ) -> npt.NDArray[np.int32] | None:
-    """Detect line segments on a single-channel edge image, drawing each one
-    onto hough_image_plot.
+    """Detect line segments on a single-channel edge image.
 
-    Returns cv2.HoughLinesP's (N, 1, 4) int32 array, or None if nothing is found.
+    Each detected line is also drawn onto hough_image_plot. Returns
+    cv2.HoughLinesP's (N, 1, 4) int32 array, or None if nothing is found.
     """
     blurred_contour_image = cv2.GaussianBlur(contour_image, (3, 3), 1)
-    hough_lines: npt.NDArray[np.int32] | None = cv2.HoughLinesP(
-        blurred_contour_image,
-        1,
-        np.pi / 180,
-        votes_valid_line,
-        None,
-        min_line_length,
-        max_line_gap,
+    hough_lines = cast(
+        npt.NDArray[np.int32] | None,
+        cv2.HoughLinesP(
+            blurred_contour_image,
+            1,
+            np.pi / 180,
+            votes_valid_line,
+            None,
+            min_line_length,
+            max_line_gap,
+        ),
     )
     # cv2.HoughLinesP returns None (not an empty array) when no lines are found.
     if hough_lines is None:
         return None
     for hough_line in hough_lines:
         x1, y1, x2, y2 = hough_line[0]
-        cv2.line(hough_image_plot, (x1, y1), (x2, y2), (255, 0, 0), 3)
+        cv2.line(hough_image_plot, (x1, y1), (x2, y2), HOUGH_PLOT_LINE_COLOR, 3)
     return hough_lines
 
 
@@ -166,8 +177,10 @@ def _draw_point_label(
     value: int,
     color: tuple[int, int, int],
 ) -> None:
-    """Draw a labeled circle marker at marker_point, with the label's text at
-    text_point (the two can differ - see callers). Mutates image in place."""
+    """Draw a circle marker at marker_point, labeled with its value at text_point.
+
+    The two points can differ (see callers). Mutates image in place.
+    """
     cv2.putText(
         image,
         f"{label}: {value}",
@@ -194,9 +207,12 @@ def get_vertical_line_y_index(
     contour_image: npt.NDArray[np.uint8],
     image: npt.NDArray[np.uint8],
 ) -> tuple[int, npt.NDArray[np.uint8]] | None:
-    """Find the first near-vertical line in the expected region (the tool
-    edge), draw it on image, and return the y of its lowest endpoint together
-    with image. Returns None if no line qualifies."""
+    """Find, draw, and return the lowest y of the tool's (vertical) edge.
+
+    Takes the first near-vertical line in the expected region, draws it on
+    image, and returns the y of its lowest endpoint together with image.
+    Returns None if no line qualifies.
+    """
     color: tuple[int, int, int] = random_color.random_line_color()
 
     # NOTE: half_height is compared against x-coordinates and half_width
@@ -234,9 +250,12 @@ def get_vertical_line_y_index(
 def get_horizontal_line_y_index(
     cleaned_lines: npt.NDArray[np.int32], image: npt.NDArray[np.uint8]
 ) -> tuple[int, npt.NDArray[np.uint8]] | None:
-    """Find the first near-horizontal line (the chip edge), draw it on image,
-    and return the y of its lowest endpoint together with image. Returns None
-    if no line qualifies."""
+    """Find, draw, and return the lowest y of the chip's (horizontal) edge.
+
+    Takes the first near-horizontal line, draws it on image, and returns the
+    y of its lowest endpoint together with image. Returns None if no line
+    qualifies.
+    """
     color: tuple[int, int, int] = random_color.random_line_color()
 
     for line in cleaned_lines:
@@ -267,11 +286,13 @@ def save_result_image(
     annotated_image: npt.NDArray[np.uint8],
     contact_length: int,
 ) -> None:
-    """Write the contact length onto annotated_image and save it to the Hough
-    results folder under image_name."""
-    output_path = os.path.join(folder_loop.OUTPUT_HOUGH_RESULTS_FOLDER, image_name)
+    """Write the contact length onto annotated_image and save it as image_name."""
+    output_path = folder_loop.OUTPUT_HOUGH_RESULTS_FOLDER / image_name
 
     text_color = random_color.random_line_color()
+    # "+ t" is intentional: t is the cutting depth between the tool and the
+    # material, a constant that can't be measured from the image, so the
+    # measured pixel length is reported as "<n>px + t".
     text = f"Dist = {contact_length}px + t"
 
     cv2.putText(
@@ -285,9 +306,9 @@ def save_result_image(
         cv2.LINE_AA,
     )
 
-    success = cv2.imwrite(output_path, annotated_image)
+    success = cv2.imwrite(str(output_path), annotated_image)
 
     if success:
-        logger.info(f"Saved hough image: {output_path}")
+        logger.info("Saved hough image: %s", output_path)
     else:
-        logger.error(f"Failed to save image: {output_path}")
+        logger.error("Failed to save image: %s", output_path)

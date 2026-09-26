@@ -17,8 +17,37 @@ dependencies = [
 Repository = "https://github.com/FrunzaDan/Tool-Chip_Contact_Length"
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "ruff", "mypy"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+# Ruff is both the linter and the formatter (`ruff check`, `ruff format`).
+[tool.ruff]
+src = ["src"]  # so `import folder_loop` etc. are sorted as first-party
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort (import order)
+    "N",       # pep8-naming
+    "D",       # pydocstyle (PEP 257 docstrings)
+    "UP",      # pyupgrade (modern syntax for the target Python)
+    "B",       # flake8-bugbear
+    "SIM",     # flake8-simplify
+    "BLE",     # blind `except Exception` must log a traceback or re-raise
+    "G",       # logging: lazy %-args, not f-strings
+    "PTH",     # pathlib instead of os.path
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D"]  # test names describe the behavior; docstrings not required
+
+[tool.mypy]
+files = ["src"]
+strict = true

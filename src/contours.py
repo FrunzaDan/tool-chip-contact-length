@@ -1,4 +1,7 @@
+"""Edge detection and contour extraction on the dilated mask."""
+
 import logging
+from typing import cast
 
 import cv2
 import numpy as np
@@ -21,7 +24,6 @@ def get_contours(
 
     Returns a single-channel image with the qualifying contours drawn in white.
     """
-
     if dilated_image is None:
         raise ValueError("No valid Dilation Image provided.")
 
@@ -31,20 +33,28 @@ def get_contours(
 
     try:
         # Step 1: Apply Gaussian Blur to reduce noise
-        blurred_image = cv2.GaussianBlur(
-            dilated_image, CONTOUR_BLUR_KERNEL_SIZE, CONTOUR_BLUR_SIGMA
+        blurred_image = cast(
+            npt.NDArray[np.uint8],
+            cv2.GaussianBlur(
+                dilated_image, CONTOUR_BLUR_KERNEL_SIZE, CONTOUR_BLUR_SIGMA
+            ),
         )
     except cv2.error as error:
-        logger.error(f"Error during GaussianBlur: {error}")
+        logger.error("Error during GaussianBlur: %s", error)
         return contour_image  # Return blank image on error
 
     try:
         # Step 2: Apply Canny edge detection
+        # apertureSize must be passed by keyword: Canny's 4th positional
+        # parameter is the `edges` output buffer, not the aperture size.
         canny_image = cv2.Canny(
-            blurred_image, canny_threshold_1, canny_threshold_2, canny_aperture_size
+            blurred_image,
+            canny_threshold_1,
+            canny_threshold_2,
+            apertureSize=canny_aperture_size,
         )
     except cv2.error as error:
-        logger.error(f"Error during Canny edge detection: {error}")
+        logger.error("Error during Canny edge detection: %s", error)
         return contour_image  # Return blank image on error
 
     # Step 3: Find contours from the Canny edges
@@ -55,10 +65,9 @@ def get_contours(
     # Step 4: Draw contours on the black image
     for contour in contours:
         contour_length = cv2.arcLength(contour, True)
-        if (
-            contour_length > MIN_CONTOUR_ARC_LENGTH
-        ):  # Only draw sufficiently large contours
+        # Only draw sufficiently large contours
+        if contour_length > MIN_CONTOUR_ARC_LENGTH:
             cv2.drawContours(contour_image, [contour], -1, 255, 2)
 
-    logger.info(f"Contours detected: {len(contours)}")
+    logger.info("Contours detected: %d", len(contours))
     return contour_image

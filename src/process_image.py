@@ -1,4 +1,10 @@
+"""Per-image pipeline: preprocessing, contact-length measurement, and plot."""
+
+import enum
 import logging
+from collections.abc import Callable
+from pathlib import Path
+from typing import Literal, ParamSpec, TypeVar, cast
 
 import cv2
 import numpy as np
@@ -9,6 +15,9 @@ import hough_lines
 import plot
 
 logger = logging.getLogger(__name__)
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 # Tunable pipeline parameters, named so they can all be found/adjusted in one
 # place instead of as bare literals scattered through the function below.
@@ -32,26 +41,40 @@ HOUGH_VOTES_THRESHOLD = 90
 HOUGH_MIN_LINE_LENGTH = 90
 HOUGH_MAX_LINE_GAP = 80
 
+
+class _StepFailed(enum.Enum):
+    """Type of the _STEP_FAILED sentinel (an Enum, so type checkers can narrow it)."""
+
+    STEP_FAILED = enum.auto()
+
+
 # Sentinel distinguishing "the step raised and was already logged" from "the
 # step legitimately returned None" (only the plot step does the latter).
-_STEP_FAILED = object()
+_STEP_FAILED = _StepFailed.STEP_FAILED
 
 
-def _run_step(step_name: str, image_name: str, func, *args, **kwargs):
+def _run_step(
+    step_name: str,
+    image_name: str,
+    func: Callable[P, R],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> R | Literal[_StepFailed.STEP_FAILED]:
     """Run one pipeline step, logging and returning _STEP_FAILED on any exception."""
     try:
         return func(*args, **kwargs)
-    except Exception as error:
-        logger.error(f"{step_name} Error at {image_name}: {error}")
+    except Exception:
+        logger.exception("%s Error at %s", step_name, image_name)
         return _STEP_FAILED
 
 
 def _resize_to_fixed_width(image: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
     """Resize image to RESIZE_WIDTH pixels wide, preserving its aspect ratio."""
     target_height = int(image.shape[0] * RESIZE_WIDTH / image.shape[1])
-    return cv2.resize(
+    resized = cv2.resize(
         image, (RESIZE_WIDTH, target_height), interpolation=cv2.INTER_LINEAR
     )
+    return cast(npt.NDArray[np.uint8], resized)
 
 
 def _crop_right_half(image: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
@@ -63,44 +86,62 @@ def _crop_right_half(image: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
     return image[:, image.shape[1] // 2 :].copy()
 
 
+def _convert_to_grayscale(image: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
+    """Convert a BGR image to single-channel grayscale."""
+    return cast(npt.NDArray[np.uint8], cv2.cvtColor(image, cv2.COLOR_BGR2GRAY))
+
+
 def _apply_otsu_threshold(image: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
+    """Binarize image with an automatically chosen (Otsu) global threshold."""
     _, thresholded = cv2.threshold(
         image, 0, OTSU_MAX_VALUE, cv2.THRESH_BINARY | cv2.THRESH_OTSU
     )
-    return thresholded
+    return cast(npt.NDArray[np.uint8], thresholded)
 
 
 def _apply_morphological_closing(
     image: npt.NDArray[np.uint8],
 ) -> npt.NDArray[np.uint8]:
+    """Close small dark holes/speckles inside the bright regions."""
     kernel = np.ones(MORPH_CLOSE_KERNEL_SIZE, np.uint8)
-    return cv2.morphologyEx(
+    closed = cv2.morphologyEx(
         image, cv2.MORPH_CLOSE, kernel, iterations=MORPH_CLOSE_ITERATIONS
     )
+    return cast(npt.NDArray[np.uint8], closed)
 
 
 def _apply_dilation(image: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
+    """Grow the bright regions to seal remaining gaps along their edges."""
     kernel = np.ones(DILATION_KERNEL_SIZE, np.uint8)
-    return cv2.dilate(image, kernel, iterations=DILATION_ITERATIONS)
+    dilated = cv2.dilate(image, kernel, iterations=DILATION_ITERATIONS)
+    return cast(npt.NDArray[np.uint8], dilated)
 
 
-def process_image(image_path: str, image_name: str) -> None:
-    """Run the full pipeline on one image: preprocess, measure the contact
-    length (saving the annotated result), and save the diagnostic plot."""
-    if not image_path:
-        logger.error("No valid image path!")
-        return
+def _read_image(image_path: Path) -> npt.NDArray[np.uint8] | None:
+    """Load image_path as an 8-bit BGR image, or return None if it can't be read."""
+    # cv2.imread does not raise on failure (bad path, corrupt/unsupported file);
+    # it returns None, so callers must check for that explicitly.
+    image = cv2.imread(str(image_path))
+    return cast(npt.NDArray[np.uint8] | None, image)
+
+
+def process_image(image_path: Path) -> None:
+    """Run the full pipeline on one image.
+
+    Preprocesses the image, measures the contact length (saving the annotated
+    result), and saves the diagnostic plot. Any step's failure is logged and
+    stops processing of this image only.
+    """
+    image_name = image_path.name
 
     # Step 1: Read the image
-    image = _run_step("Read", image_name, cv2.imread, image_path)
+    image = _run_step("Read", image_name, _read_image, image_path)
     if image is _STEP_FAILED:
         return
-    # cv2.imread does not raise on failure (bad path, corrupt/unsupported file);
-    # it returns None, so this must be checked explicitly.
     if image is None:
         logger.error(
-            f"Could not read image (missing, corrupt, or unsupported format): "
-            f"{image_name}"
+            "Could not read image (missing, corrupt, or unsupported format): %s",
+            image_name,
         )
         return
 
@@ -116,7 +157,7 @@ def process_image(image_path: str, image_name: str) -> None:
 
     # Step 4: Grayscale
     grayscale_image = _run_step(
-        "Grayscale", image_name, cv2.cvtColor, cropped_image, cv2.COLOR_BGR2GRAY
+        "Grayscale", image_name, _convert_to_grayscale, cropped_image
     )
     if grayscale_image is _STEP_FAILED:
         return
@@ -190,5 +231,5 @@ def process_image(image_path: str, image_name: str) -> None:
         return
 
     # Final log messages
-    logger.info(f"Finished processing image [{image_name}]")
+    logger.info("Finished processing image [%s]", image_name)
     logger.info("--------------------")

@@ -1,5 +1,8 @@
+"""The 6-panel diagnostic grid of every pipeline stage for one image."""
+
 import logging
-import os
+from pathlib import Path
+from typing import cast
 
 import cv2
 import numpy as np
@@ -20,6 +23,8 @@ MARGIN = 6
 
 BACKGROUND_COLOR = (245, 245, 245)  # light gray, BGR - grid background/gutters
 PANEL_BACKGROUND_COLOR = (255, 255, 255)  # white - behind each letterboxed image
+IMAGE_BORDER_COLOR = (0, 0, 0)  # black - thin frame around each panel image
+IMAGE_BORDER_THICKNESS = 1
 
 TITLE_FONT = cv2.FONT_HERSHEY_SIMPLEX
 TITLE_FONT_SCALE = 0.6
@@ -33,15 +38,18 @@ SUPTITLE_FONT_THICKNESS = 2
 def _to_bgr(image: npt.NDArray[np.uint8]) -> npt.NDArray[np.uint8]:
     """Ensure image has 3 channels so it can be composited into a color grid."""
     if image.ndim == 2 or (image.ndim == 3 and image.shape[2] == 1):
-        return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        return cast(npt.NDArray[np.uint8], cv2.cvtColor(image, cv2.COLOR_GRAY2BGR))
     return image
 
 
 def _resize_to_fit(
     image: npt.NDArray[np.uint8], target_width: int, target_height: int
 ) -> npt.NDArray[np.uint8]:
-    """Resize image to fit within (target_width, target_height) preserving its
-    aspect ratio, centered on a white canvas of exactly that size (letterboxed)."""
+    """Letterbox image into a target_width x target_height white canvas.
+
+    The image is scaled to fit while preserving its aspect ratio, centered, and
+    framed with a thin black border.
+    """
     src_height, src_width = image.shape[:2]
     scale = min(target_width / src_width, target_height / src_height)
     new_width = max(1, round(src_width * scale))
@@ -54,6 +62,15 @@ def _resize_to_fit(
     x_offset = (target_width - new_width) // 2
     y_offset = (target_height - new_height) // 2
     canvas[y_offset : y_offset + new_height, x_offset : x_offset + new_width] = resized
+    # Drawn inside the image's own edge pixels, so it frames the image itself
+    # (not the white letterbox padding) and never spills outside the canvas.
+    cv2.rectangle(
+        canvas,
+        (x_offset, y_offset),
+        (x_offset + new_width - 1, y_offset + new_height - 1),
+        IMAGE_BORDER_COLOR,
+        IMAGE_BORDER_THICKNESS,
+    )
     return canvas
 
 
@@ -88,9 +105,7 @@ def save_entire_process_plot(
     hough_image_plot: npt.NDArray[np.uint8],
     image_name: str,
 ) -> None:
-    """
-    Build a 2x3 diagnostic grid of the pipeline's intermediate images and save
-    it as a PNG.
+    """Build a 2x3 grid of the pipeline's intermediate images and save it as a PNG.
 
     This composites the grid directly with OpenCV (resize + tile + text)
     rather than matplotlib: profiling showed matplotlib's savefig() alone
@@ -132,16 +147,16 @@ def save_entire_process_plot(
         x = MARGIN + col * (panel_width + MARGIN)
         canvas[y : y + panel_height, x : x + panel_width] = panel
 
-    image_base_name, _ = os.path.splitext(image_name)
-    output_path = os.path.join(
-        folder_loop.OUTPUT_PLOT_RESULTS_FOLDER, f"{image_base_name}.png"
-    )
+    image_base_name = Path(image_name).stem
+    output_path = folder_loop.OUTPUT_PLOT_RESULTS_FOLDER / f"{image_base_name}.png"
 
     try:
-        success = cv2.imwrite(output_path, canvas)
-        if success:
-            logger.info(f"Saved plot image: {output_path}")
-        else:
-            logger.error(f"Failed to save plot image: {output_path}")
-    except Exception as e:
-        logger.error(f"Error saving plot image for {image_name}: {e}")
+        success = cv2.imwrite(str(output_path), canvas)
+    except cv2.error as error:
+        logger.error("Error saving plot image for %s: %s", image_name, error)
+        return
+
+    if success:
+        logger.info("Saved plot image: %s", output_path)
+    else:
+        logger.error("Failed to save plot image: %s", output_path)

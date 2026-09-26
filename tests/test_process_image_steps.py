@@ -2,8 +2,8 @@ import numpy as np
 
 import process_image
 from process_image import (
-    RESIZE_WIDTH,
     _STEP_FAILED,
+    RESIZE_WIDTH,
     _apply_dilation,
     _apply_otsu_threshold,
     _crop_right_half,

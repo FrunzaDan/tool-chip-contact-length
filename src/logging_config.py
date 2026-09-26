@@ -1,28 +1,29 @@
+"""Logging setup for the application: one call, from the entry point."""
+
 import logging
-import os
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 # Log directory, relative to this file so it works from any working directory.
-LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Logs")
+LOG_DIR = Path(__file__).resolve().parent.parent / "Logs"
 
-LOG_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 LOG_MAX_BYTES = 10 * 1024 * 1024
 LOG_BACKUP_COUNT = 5
 
 
 def configure_logging() -> None:
-    """Send log records from every module to a timestamped file in LOG_DIR
-    and to the console.
+    """Send log records from every module to a timestamped file and the console.
 
     Each module gets its own logger via logging.getLogger(__name__); this
     configures the root logger once, from the entry point, so importing a
     module (e.g. from the tests) has no side effects.
     """
-    os.makedirs(LOG_DIR, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
 
     current_time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_file = os.path.join(LOG_DIR, f"TCCL_process_{current_time_str}.log")
+    log_file = LOG_DIR / f"TCCL_process_{current_time_str}.log"
 
     formatter = logging.Formatter(LOG_FORMAT)
 

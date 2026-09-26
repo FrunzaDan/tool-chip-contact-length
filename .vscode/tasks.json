@@ -4,9 +4,9 @@
     {
       "label": "Install Python Dependencies",
       "type": "shell",
-      "command": "source .venv/bin/activate && pip3 install $(python3 -c \"import tomllib, shlex; deps = tomllib.load(open('${workspaceFolder}/pyproject.toml', 'rb'))['project']['dependencies']; print(' '.join(shlex.quote(d) for d in deps))\")",
+      "command": "source .venv/bin/activate && pip3 install -e '${workspaceFolder}[dev]'",
       "group": "build",
-      "detail": "Installs Python packages declared in pyproject.toml",
+      "detail": "Installs the project and its dev tools (pytest, ruff, mypy) from pyproject.toml",
       "presentation": {
         "echo": true,
         "reveal": "always",
@@ -18,9 +18,9 @@
     {
       "label": "Clean Python Project",
       "type": "shell",
-      "command": "source .venv/bin/activate && echo 'Cleaning up...' && rm -rf ${workspaceFolder}/.pytest_cache",
+      "command": "source .venv/bin/activate && echo 'Cleaning up...' && rm -rf ${workspaceFolder}/.pytest_cache ${workspaceFolder}/.mypy_cache ${workspaceFolder}/.ruff_cache",
       "group": "none",
-      "detail": "Removes test cache and other temporary files",
+      "detail": "Removes test, type-check, and lint caches",
       "presentation": {
         "reveal": "always",
         "panel": "shared"
@@ -28,11 +28,35 @@
       "problemMatcher": []
     },
     {
-      "label": "Format with Black",
+      "label": "Lint & Format (ruff)",
       "type": "shell",
-      "command": "source .venv/bin/activate && black ${workspaceFolder}/src",
+      "command": "source .venv/bin/activate && ruff check --fix ${workspaceFolder} && ruff format ${workspaceFolder}",
       "group": "build",
-      "detail": "Formats Python code in /src with Black",
+      "detail": "Fixes lint issues and formats all Python code with ruff",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Type Check (mypy)",
+      "type": "shell",
+      "command": "source .venv/bin/activate && cd ${workspaceFolder} && mypy",
+      "group": "build",
+      "detail": "Type-checks src/ with mypy (strict, config in pyproject.toml)",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Tests (pytest)",
+      "type": "shell",
+      "command": "source .venv/bin/activate && cd ${workspaceFolder} && pytest",
+      "group": "test",
+      "detail": "Runs the pytest suite",
       "presentation": {
         "reveal": "always",
         "panel": "shared"
