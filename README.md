@@ -1,21 +1,22 @@
 # Tool-Chip Contact Length
 
-A Python computer-vision tool that measures the tool-chip contact length in metal-cutting photos taken by a high-speed camera. It processes a folder of frames in one batch and measures each one in pixels, replacing slow manual measurement of every frame.
+Tool-Chip Contact Length is a Python tool that measures the tool-chip contact length in photos of metal cutting. When a cutting tool removes metal, the chip it peels off stays in contact with the tool's face for a short distance before curling away, and that distance is the contact length. A high-speed camera captures the cutting zone frame by frame, and this tool measures that distance on every frame automatically instead of by hand. It uses classic OpenCV image processing (thresholding, morphology, edge detection and Hough line detection) rather than machine learning, so every step can be inspected. `run.sh` sets up the environment and processes the whole dataset in one command, saving an annotated image and a diagnostic plot for each frame.
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-- **Batch processing:** Runs every `.bmp` frame in the input folder through the same pipeline, in sorted order. A failure on one image is logged and the batch moves on.
-- **Classic OpenCV pipeline:** Resize, crop, grayscale, Otsu threshold, morphological closing and dilation, Canny edges and contour filtering, then probabilistic Hough line detection.
-- **Contact length measurement:** Classifies the detected lines into the tool's vertical edge and the chip's horizontal edge, and measures the pixel distance between them.
-- **Annotated results:** Saves each frame with the detected lines and measured length drawn on it.
-- **Diagnostic plots:** Saves a 6-panel image per frame showing every intermediate stage, so you can check where a measurement went wrong.
-- **Run logging:** `run.sh` checks the environment, installs missing dependencies and writes a timestamped run log with a summary (images found, results produced, timings).
+- **Batch processing:** Every `.bmp` frame in the input folder goes through the same pipeline in sorted name order. If one image fails, the error is logged with a traceback and the batch moves on to the next frame.
+- **Classic OpenCV pipeline:** Each frame is resized to a fixed width, cropped to the right half (where the cutting happens), converted to grayscale and thresholded with Otsu. Morphological closing and dilation then turn the tool and chip into solid shapes, and Canny edges with contour filtering keep only their main outline.
+- **Contact length measurement:** Probabilistic Hough line detection finds straight edges in that outline. The lines are de-duplicated and classified into the tool's vertical edge and the chip's horizontal edge, and the contact length is the pixel distance between them.
+- **Annotated results:** For every frame where both edges were found, an image is saved with the detected lines and the measured length drawn on it.
+- **Diagnostic plots:** For each processed frame, a 6-panel image shows every intermediate stage side by side, so you can see exactly where a measurement went wrong.
+- **One-command run script:** `run.sh` finds a Python 3.11+ interpreter, checks the dependencies declared in `pyproject.toml` and installs any that are missing. It then runs the pipeline and writes a timestamped log ending in a summary of images found, results produced and how long it took.
+- **Code quality checks:** pytest unit tests cover the line classification, de-duplication, measurement and pipeline helpers. Ruff handles linting and formatting, and mypy runs in strict mode.
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Frontend:** N/A (command-line tool)
 - **Backend:** Python 3.11+
@@ -24,7 +25,7 @@ A Python computer-vision tool that measures the tool-chip contact length in meta
 
 ---
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before running this project, ensure you have the following installed:
 
@@ -34,7 +35,7 @@ Before running this project, ensure you have the following installed:
 
 ---
 
-## ⚙️ Local Setup & Running
+## Local Setup & Running
 
 ### 1. Clone the repository
 
@@ -85,7 +86,7 @@ mypy
 
 ---
 
-## 🔌 API / App Usage
+## API / App Usage
 
 Outputs are written to:
 
@@ -99,7 +100,7 @@ The overall flow is shown in [`Documentation/Diagrams/TCCL_General_Flow.jpeg`](D
 
 ---
 
-## 📝 License & Notes
+## License & Notes
 
 Personal project with no license file.
 
