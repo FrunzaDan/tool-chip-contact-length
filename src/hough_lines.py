@@ -240,9 +240,8 @@ def get_vertical_line_y_index(
         if y2 > y1:
             _draw_point_label(image, (x2, y2), (x2 - 150, y2 + 40), "Y2", y2, color)
             return y2, image
-        else:
-            _draw_point_label(image, (x1, y1), (x1 - 150, y1 + 40), "Y1", y1, color)
-            return y1, image
+        _draw_point_label(image, (x1, y1), (x1 - 150, y1 + 40), "Y1", y1, color)
+        return y1, image
 
     return None
 
@@ -270,13 +269,12 @@ def get_horizontal_line_y_index(
         if y2 > y1:
             _draw_point_label(image, (x2, y2), (x2 - 20, y1 - 30), "Y2", y2, color)
             return y2, image
-        elif y2 == y1:
+        if y2 == y1:
             _draw_point_label(image, (x2, y2), (x2 - 20, y1 - 30), "Y2", y2, color)
             _draw_point_label(image, (x1, y1), (x1 + 20, y1 - 30), "Y1", y1, color)
             return y1, image
-        else:
-            _draw_point_label(image, (x1, y1), (x1 + 20, y1 - 30), "Y1", y1, color)
-            return y1, image
+        _draw_point_label(image, (x1, y1), (x1 + 20, y1 - 30), "Y1", y1, color)
+        return y1, image
 
     return None
 

@@ -40,13 +40,27 @@ select = [
     "BLE",     # blind `except Exception` must log a traceback or re-raise
     "G",       # logging: lazy %-args, not f-strings
     "PTH",     # pathlib instead of os.path
+    "S",       # flake8-bandit (security)
+    "C4",      # flake8-comprehensions
+    "PIE",     # flake8-pie (redundant code)
+    "PERF",    # perflint (slow loop patterns)
+    "NPY",     # NumPy-specific rules (deprecated APIs, legacy random)
+    "PT",      # flake8-pytest-style
+    "RET",     # flake8-return
+    "ARG",     # unused arguments
+    "PLE",     # pylint errors
+    "PLW",     # pylint warnings
+    "RUF",     # Ruff's own rules
 ]
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["D"]  # test names describe the behavior; docstrings not required
+# Test names describe the behavior, so docstrings aren't required; pytest
+# checks with `assert`, and monkeypatched stand-ins ignore their arguments.
+"tests/*" = ["D", "S101", "ARG"]
+"src/random_color.py" = ["S311"]  # annotation colors, not cryptography
 
 [tool.mypy]
 files = ["src"]

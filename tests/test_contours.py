@@ -5,7 +5,7 @@ from contours import MIN_CONTOUR_ARC_LENGTH, get_contours
 
 
 def test_raises_on_none_input():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="No valid Dilation Image"):
         get_contours(None, 100, 200, 3)
 
 

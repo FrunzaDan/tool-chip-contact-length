@@ -13,7 +13,7 @@ How the project's dependencies, run script, code-quality tooling (tests, linter,
 - `tests/` — pytest unit tests (see [[known_gaps]] for what they don't cover).
 - `.vscode/launch.json` — F5 debug config: runs `src/main.py` with cwd `src/`, `preLaunchTask` = `Install Python Dependencies`, `postDebugTask` = `Clean Python Project`.
 - `.vscode/tasks.json` — `Install Python Dependencies` (`pip install -e '.[dev]'` into `.venv`), `Clean Python Project` (deletes pytest/mypy/ruff caches), `Lint & Format (ruff)`, `Type Check (mypy)`, `Run Tests (pytest)`.
-- `.vscode/settings.json` — Ruff as the Python formatter; on save: format, fix lint issues, sort imports. Type inlay hints.
+- `.vscode/settings.json` — the interpreter is `.venv/bin/python`, and `src` is on Pylance's import path (mirroring pytest's `pythonpath`). Ruff as the Python formatter; on save: format, fix lint issues, sort imports. Type inlay hints.
 - `.vscode/extensions.json` — recommends the Python, Ruff, and Mypy Type Checker extensions.
 - `.gitignore` — ignores `Input/` (the dataset is not in the repo), `Logs/*.log`, and generated `Output/` images.
 
