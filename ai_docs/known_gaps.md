@@ -24,7 +24,7 @@ Things known to be incomplete, fragile, or empirically-hacky, kept here so futur
 
 ## Import-time side effects and module coupling
 
-Importing `folder_loop` creates the two `Output/` folders (`os.makedirs` at module level). `hough_lines` and `plot` import `folder_loop` only to read its output-folder constants, so importing either one (e.g. in tests) triggers that too, and there's an import cycle-in-waiting (`folder_loop` → `process_image` → `hough_lines` → `folder_loop`) that only works because the constants are read at call time.
+Importing `folder_loop` creates the two `Output/` folders (`Path.mkdir` at module level). `hough_lines` and `plot` import `folder_loop` only to read its output-folder constants, so importing either one (e.g. in tests) triggers that too, and there's an import cycle-in-waiting (`folder_loop` → `process_image` → `hough_lines` → `folder_loop`) that only works because the constants are read at call time.
 
 ## Automated tests cover unit logic only, not the full pipeline
 

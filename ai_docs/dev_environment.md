@@ -16,7 +16,7 @@ How the project's dependencies, run script, code-quality tooling (tests, linter,
 - `.vscode/tasks.json` — `Install Python Dependencies` (`pip install -e '.[dev]'` into `.venv`), `Clean Python Project` (deletes pytest/mypy/ruff caches), `Lint & Format (ruff)`, `Type Check (mypy)`, `Run Tests (pytest)`.
 - `.vscode/settings.json` — the interpreter is `.venv/bin/python`, and `src` is on Pylance's import path (mirroring pytest's `pythonpath`). Ruff as the Python formatter; on save: format, fix lint issues, sort imports. Type inlay hints.
 - `.vscode/extensions.json` — recommends the Python, Ruff, and Mypy Type Checker extensions.
-- `.gitignore` — ignores `Input/` (the dataset is not in the repo), `Logs/*.log`, and generated `Output/` images.
+- `.gitignore` — ignores `Input/`, `Logs/*.log`, and generated `Output/` images. `Input/Complete_Dataset.zip` (the sample dataset, ~100 MB) and `Input/uncompress_here` are force-added despite the `Input/` rule, so a clone has the zip but not the extracted `Complete_Dataset/` folder.
 
 ## How it works
 
@@ -31,7 +31,7 @@ How the project's dependencies, run script, code-quality tooling (tests, linter,
 - The VS Code debug config takes a different path: its `preLaunchTask` runs `pip install -e '.[dev]'` into `.venv` (`source .venv/bin/activate`), rather than reusing `run.sh`.
 - Dev setup: `pip install -e '.[dev]'` (quote it in zsh). Editable install works without a `[build-system]` table because pip falls back to setuptools; it leaves a git-ignored `src/*.egg-info/`.
 - Tests: `python3 -m pytest` from the repo root. `pythonpath = ["src"]` makes the flat `src/` modules importable (`import hough_lines`, etc.) even without installing the project.
-- Linting and formatting: [Ruff](https://docs.astral.sh/ruff/) does both — `ruff check .` (add `--fix` to auto-fix) and `ruff format .`. It replaces Black (formatter), isort, flake8, and pydocstyle. Enabled rule sets (`[tool.ruff.lint] select`): pycodestyle `E`/`W`, pyflakes `F`, isort `I`, pep8-naming `N`, pydocstyle `D` (PEP 257 convention; not required in `tests/`), pyupgrade `UP`, bugbear `B`, simplify `SIM`, blind-except `BLE`, logging-format `G`, pathlib `PTH`. Line length is Ruff's default, 88.
+- Linting and formatting: [Ruff](https://docs.astral.sh/ruff/) does both — `ruff check .` (add `--fix` to auto-fix) and `ruff format .`. It replaces Black (formatter), isort, flake8, and pydocstyle. Enabled rule sets (`[tool.ruff.lint] select`): pycodestyle `E`/`W`, pyflakes `F`, isort `I`, pep8-naming `N`, pydocstyle `D` (PEP 257 convention), pyupgrade `UP`, bugbear `B`, simplify `SIM`, blind-except `BLE`, logging-format `G`, pathlib `PTH`, bandit `S`, comprehensions `C4`, pie `PIE`, perflint `PERF`, NumPy `NPY`, pytest-style `PT`, return `RET`, unused-arguments `ARG`, pylint errors/warnings `PLE`/`PLW`, and Ruff's own `RUF`. Per-file ignores: `tests/*` skips `D`, `S101` (assert) and `ARG`; `src/random_color.py` skips `S311` (non-crypto random). Line length is Ruff's default, 88.
 - Type checking: `mypy` (config `files = ["src"]`, `strict = true`). OpenCV's bundled stubs type most return values as a broad `MatLike`, so results are narrowed to `npt.NDArray[np.uint8]` / `NDArray[np.int32]` with `typing.cast` where they come out of `cv2` calls.
 - Importing modules in tests has one side effect: importing `folder_loop` (directly, or via `hough_lines`/`plot`/`process_image`) creates `Output/folder_hough_results/` and `Output/folder_plot_results/`. Logging is *not* configured on import, so tests don't create log files.
 

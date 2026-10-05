@@ -17,6 +17,30 @@ The program is a batch pipeline: it loops over every image in an input folder, r
 
 See `Documentation/Diagrams/TCCL_General_Flow.jpeg` for the original flow diagram referenced in the README.
 
+## How the code fits together
+
+```
+run.sh ─► src/main.py: configure_logging() → folder_loop.process_folder()
+            for each .bmp in Input/Complete_Dataset/ (sorted):
+              process_image.process_image(path)        every step wrapped in _run_step()
+                read → resize → crop right half → grayscale → Otsu → closing → dilation
+                → contours.get_contours()              blur + Canny + keep long contours
+                → hough_lines.measure_contact_length() Hough → clean → classify → measure → save result image
+                → plot.save_entire_process_plot()      6-panel diagnostic grid
+```
+
+There is no shared state between images and no aggregate output: each frame produces at most one annotated image, one plot and its log lines.
+
+## Where to look
+
+| Question | Doc |
+|---|---|
+| What each pipeline step does, with pictures | this file → Step-by-step pipeline |
+| How the two lines are chosen and the length computed | [line_detection_and_measurement.md](line_detection_and_measurement.md) |
+| Which constant to change, and whether it affects the result | [pipeline_parameters.md](pipeline_parameters.md) |
+| Setup, `run.sh`/`build.sh`, Ruff/mypy/pytest, VS Code | [dev_environment.md](dev_environment.md) |
+| Known bugs, hacks and missing pieces | [known_gaps.md](known_gaps.md) |
+
 ## Project layout
 
 ```
@@ -39,7 +63,8 @@ ai_docs/                This documentation
 Documentation/          Flow diagram, per-step example images (used below), original write-up (PDF/TCCL.pages)
 .vscode/                Debug config, install/clean/lint/type-check/test tasks, Ruff as formatter
 
-Input/Complete_Dataset/        Source .bmp images (one per high-speed camera frame) — git-ignored, not in the repo
+Input/Complete_Dataset.zip     The sample dataset (~100 MB, 404 frames), force-added to git despite the Input/ ignore rule
+Input/Complete_Dataset/        Source .bmp images (one per high-speed camera frame), extracted from the zip — git-ignored
 Output/folder_hough_results/   Annotated result images (same name as input, .bmp) — only for frames where both lines were found
 Output/folder_plot_results/    6-panel diagnostic plots (<image_base_name>.png, one per successfully processed image)
 Logs/                          run_<timestamp>.log (from run.sh) and TCCL_process_<timestamp>.log (from the app itself)
@@ -63,7 +88,7 @@ Logs/                          run_<timestamp>.log (from run.sh) and TCCL_proces
 1. Install dependencies: `pip install opencv-python numpy` (as declared in `pyproject.toml`).
 2. Run `python main.py` from inside `src/` (the modules import each other as top-level modules, so `src/` must be the working directory — as in `.vscode/launch.json`).
 
-Either way, put the `.bmp` frames to analyze in `Input/Complete_Dataset/` first (the folder is git-ignored, so a fresh clone has no dataset). Files are processed in sorted name order. Results appear in `Output/folder_hough_results/` and `Output/folder_plot_results/` (both created automatically if missing); a new log file is created in `Logs/` for each run.
+Either way, put the `.bmp` frames to analyze in `Input/Complete_Dataset/` first. A fresh clone has only the zip, so extract it in place (`cd Input && unzip Complete_Dataset.zip`); the extracted folder is git-ignored. Files are processed in sorted name order. Results appear in `Output/folder_hough_results/` and `Output/folder_plot_results/` (both created automatically if missing); a new log file is created in `Logs/` for each run.
 
 **Development:** `./build.sh` sets up `.venv` with `pip install -e '.[dev]'` and runs every check (`--skip-tests` skips pytest). Checks can also run manually, or via the VS Code tasks: `pytest`, `ruff check .`, `ruff format .`, `mypy`. See [dev_environment.md](dev_environment.md).
 
