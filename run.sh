@@ -3,9 +3,10 @@
 # Runs the Tool-Chip Contact Length (TCCL) application.
 #
 # What it does, in order:
-#   1. Locates a usable Python 3 interpreter (and checks its version).
-#   2. Checks which packages declared in pyproject.toml are already installed,
-#      and installs whatever is missing.
+#   1. Locates a usable Python 3 interpreter (and checks its version), then
+#      creates the project's .venv with it if there isn't one yet.
+#   2. Checks which packages declared in pyproject.toml are already installed
+#      in .venv, and installs whatever is missing there.
 #   3. Runs the app (src/main.py) and logs everything to Logs/.
 #
 # Usage: ./run.sh
@@ -17,6 +18,7 @@ set -eu
 # ---------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYPROJECT_FILE="$SCRIPT_DIR/pyproject.toml"
+VENV_DIR="$SCRIPT_DIR/.venv"
 LOG_DIR="$SCRIPT_DIR/Logs"
 mkdir -p "$LOG_DIR"
 RUN_LOG="$LOG_DIR/run_$(date +%Y-%m-%d_%H-%M-%S).log"
@@ -45,7 +47,7 @@ SCRIPT_START_EPOCH=$(date +%s)
 log "===== TCCL run script started ====="
 
 # ---------------------------------------------------------------------------
-# Step 1: Find and validate a Python interpreter.
+# Step 1: Find and validate a Python interpreter, then create/use .venv.
 # ---------------------------------------------------------------------------
 MIN_PYTHON_MAJOR=3
 MIN_PYTHON_MINOR=11  # 3.11+ needed for the standard-library 'tomllib' TOML parser
@@ -68,7 +70,6 @@ PYTHON_PATH="$(command -v "$PYTHON_BIN")"
 PYTHON_VERSION="$("$PYTHON_BIN" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
 PYTHON_FULL_VERSION="$("$PYTHON_BIN" -c 'import sys; print(sys.version.replace(chr(10), " "))')"
 PYTHON_IMPLEMENTATION="$("$PYTHON_BIN" -c 'import platform; print(platform.python_implementation())')"
-IN_VIRTUALENV="$("$PYTHON_BIN" -c 'import sys; print("yes" if sys.prefix != getattr(sys, "base_prefix", sys.prefix) else "no")')"
 OS_NAME="$(uname -s)"
 OS_ARCH="$(uname -m)"
 
@@ -77,12 +78,34 @@ log "OS: $OS_NAME ($OS_ARCH)"
 log "Python executable: $PYTHON_PATH"
 log "Python implementation: $PYTHON_IMPLEMENTATION"
 log "Python version: $PYTHON_FULL_VERSION"
-log "Running inside a virtual environment: $IN_VIRTUALENV"
 
 if ! "$PYTHON_BIN" -c "import sys; sys.exit(0 if sys.version_info >= (${MIN_PYTHON_MAJOR}, ${MIN_PYTHON_MINOR}) else 1)"; then
     log "ERROR: Python $PYTHON_VERSION was found, but this app requires ${MIN_PYTHON_MAJOR}.${MIN_PYTHON_MINOR} or newer."
     exit 1
 fi
+
+# Dependencies go into the project's own virtual environment (the same .venv VS Code
+# uses), never into the system interpreter: package-managed Pythons such as Homebrew's
+# refuse a global `pip install` (PEP 668), and it keeps this project's versions
+# separate from everything else on the machine.
+if [ ! -d "$VENV_DIR" ]; then
+    log "No virtual environment at $VENV_DIR, creating one with $PYTHON_PATH..."
+    if ! "$PYTHON_BIN" -m venv "$VENV_DIR" >>"$RUN_LOG" 2>&1; then
+        log "ERROR: Failed to create the virtual environment. See $RUN_LOG for details."
+        exit 1
+    fi
+fi
+# Git Bash on Windows lays a venv out as Scripts/python.exe instead of bin/python.
+if [ -x "$VENV_DIR/bin/python" ]; then
+    PYTHON_BIN="$VENV_DIR/bin/python"
+else
+    PYTHON_BIN="$VENV_DIR/Scripts/python.exe"
+fi
+if ! "$PYTHON_BIN" -c "import sys; sys.exit(0 if sys.version_info >= (${MIN_PYTHON_MAJOR}, ${MIN_PYTHON_MINOR}) else 1)" 2>/dev/null; then
+    log "ERROR: $VENV_DIR is broken or uses a Python older than ${MIN_PYTHON_MAJOR}.${MIN_PYTHON_MINOR}. Delete it and re-run."
+    exit 1
+fi
+log "Virtual environment: $VENV_DIR ($("$PYTHON_BIN" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))'))"
 
 if ! PIP_VERSION_OUTPUT="$("$PYTHON_BIN" -m pip --version 2>&1)"; then
     log "ERROR: pip is not available for $PYTHON_BIN. Install pip (e.g. '$PYTHON_BIN -m ensurepip') and try again."

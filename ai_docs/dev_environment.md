@@ -20,8 +20,8 @@ How the project's dependencies, run script, code-quality tooling (tests, linter,
 ## How it works
 
 - `run.sh` is the primary entry point:
-  1. Finds a Python 3.11+ interpreter (`python3`, then `python`). 3.11+ is required only so it can read `pyproject.toml` with the standard-library `tomllib`. Also logs OS, interpreter path/implementation/version, venv yes/no, and `pip --version`.
-  2. Reads `[project.dependencies]`, checks each with `pip show` (logging version + location), and `pip install`s only the missing ones.
+  1. Finds a Python 3.11+ interpreter (`python3`, then `python`). 3.11+ is required only so it can read `pyproject.toml` with the standard-library `tomllib`. Also logs OS, interpreter path/implementation/version and `pip --version`. Then creates `.venv` with it if missing (the same one VS Code uses) and switches to `.venv`'s Python for everything after, so nothing is installed into the system interpreter.
+  2. Reads `[project.dependencies]`, checks each with `pip show` (logging version + location), and `pip install`s only the missing ones, into `.venv`.
   3. `cd src && python main.py`, tee'ing output into `Logs/run_<timestamp>.log`.
   4. Prints a summary: input `.bmp` count, result/plot files created *by this run* (compared against a temp marker file's mtime), image-processing time, total time. Exits with the app's exit code.
 - `main()` calls `configure_logging()` (root logger → console + `Logs/TCCL_process_<timestamp>.log`), then `folder_loop.process_folder()`.

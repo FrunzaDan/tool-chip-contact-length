@@ -11,7 +11,7 @@ Tool-Chip Contact Length is a Python tool that measures the tool-chip contact le
 - **Contact length measurement:** Probabilistic Hough line detection finds straight edges in that outline. The lines are de-duplicated and classified into the tool's vertical edge and the chip's horizontal edge, and the contact length is the pixel distance between them.
 - **Annotated results:** For every frame where both edges were found, an image is saved with the detected lines and the measured length drawn on it.
 - **Diagnostic plots:** For each processed frame, a 6-panel image shows every intermediate stage side by side, so you can see exactly where a measurement went wrong.
-- **One-command run script:** `run.sh` finds a Python 3.11+ interpreter, checks the dependencies declared in `pyproject.toml` and installs any that are missing. It then runs the pipeline and writes a timestamped log ending in a summary of images found, results produced and how long it took.
+- **One-command run script:** `run.sh` finds a Python 3.11+ interpreter, creates the project's `.venv` if there isn't one, checks the dependencies declared in `pyproject.toml` and installs any that are missing into it. It then runs the pipeline and writes a timestamped log ending in a summary of images found, results produced and how long it took.
 - **Code quality checks:** pytest unit tests cover the line classification, de-duplication, measurement and pipeline helpers. Ruff handles linting and formatting, and mypy runs in strict mode.
 
 ---
@@ -62,11 +62,12 @@ cd ..
 ./run.sh
 ```
 
-The script finds a Python 3.11+ interpreter, installs any missing dependencies from `pyproject.toml`, runs `src/main.py` and prints a summary at the end.
+The script finds a Python 3.11+ interpreter, creates `.venv` if needed, installs any missing dependencies from `pyproject.toml` into it, runs `src/main.py` and prints a summary at the end.
 
 To run it manually instead:
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate
 pip install opencv-python numpy
 cd src
 python main.py
@@ -77,6 +78,7 @@ Run it from inside `src/`, because the modules import each other as top-level mo
 For development:
 
 ```bash
+source .venv/bin/activate
 pip install -e '.[dev]'
 pytest
 ruff check .
