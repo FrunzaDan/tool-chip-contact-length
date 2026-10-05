@@ -75,7 +75,7 @@ python main.py
 
 Run it from inside `src/`, because the modules import each other as top-level modules.
 
-For development:
+For development, `./build.sh` sets up `.venv` with the dev dependencies and runs all the checks: Ruff (lint and format check), mypy and pytest. Pass `--skip-tests` to skip pytest. It doesn't process the dataset. To run the checks by hand:
 
 ```bash
 source .venv/bin/activate

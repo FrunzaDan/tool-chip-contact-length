@@ -20,6 +20,7 @@ See `Documentation/Diagrams/TCCL_General_Flow.jpeg` for the original flow diagra
 ## Project layout
 
 ```
+build.sh                Dev checks: sets up .venv with the dev extra, then Ruff, mypy, pytest (no dataset run)
 run.sh                  Convenience script: finds Python, checks/installs deps, runs the app, logs everything
 pyproject.toml          PEP 621 manifest: deps (OpenCV, NumPy), `dev` extra (pytest, ruff, mypy), tool config — no build-system, the app runs as scripts
 
@@ -64,7 +65,7 @@ Logs/                          run_<timestamp>.log (from run.sh) and TCCL_proces
 
 Either way, put the `.bmp` frames to analyze in `Input/Complete_Dataset/` first (the folder is git-ignored, so a fresh clone has no dataset). Files are processed in sorted name order. Results appear in `Output/folder_hough_results/` and `Output/folder_plot_results/` (both created automatically if missing); a new log file is created in `Logs/` for each run.
 
-**Development:** `pip install -e '.[dev]'`. Checks (run manually, or via the VS Code tasks): `pytest`, `ruff check .`, `ruff format .`, `mypy`. See [dev_environment.md](dev_environment.md).
+**Development:** `./build.sh` sets up `.venv` with `pip install -e '.[dev]'` and runs every check (`--skip-tests` skips pytest). Checks can also run manually, or via the VS Code tasks: `pytest`, `ruff check .`, `ruff format .`, `mypy`. See [dev_environment.md](dev_environment.md).
 
 ## Step-by-step pipeline
 
