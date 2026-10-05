@@ -10,7 +10,7 @@ Tool-Chip Contact Length is a Python tool that measures the tool-chip contact le
 - **Classic OpenCV pipeline:** Each frame is resized to a fixed width, cropped to the right half (where the cutting happens), converted to grayscale and thresholded with Otsu. Morphological closing and dilation then turn the tool and chip into solid shapes, and Canny edges with contour filtering keep only their main outline.
 - **Contact length measurement:** Probabilistic Hough line detection finds straight edges in that outline. The lines are de-duplicated and classified into the tool's vertical edge and the chip's horizontal edge, and the contact length is the pixel distance between them.
 - **Annotated results:** For every frame where both edges were found, an image is saved with the detected lines and the measured length drawn on it.
-- **Diagnostic plots:** For each processed frame, a 6-panel image shows every intermediate stage side by side, so you can see exactly where a measurement went wrong.
+- **Diagnostic plots:** For each processed frame, a 6-panel grid (drawn with OpenCV itself, no plotting library) shows every intermediate stage side by side, so you can see exactly where a measurement went wrong.
 - **One-command run script:** `run.sh` finds a Python 3.11+ interpreter, creates the project's `.venv` if there isn't one, checks the dependencies declared in `pyproject.toml` and installs any that are missing into it. It then runs the pipeline and writes a timestamped log ending in a summary of images found, results produced and how long it took.
 - **Code quality checks:** pytest unit tests cover the line classification, de-duplication, measurement and pipeline helpers. Ruff handles linting and formatting, and mypy runs in strict mode.
 
@@ -82,7 +82,7 @@ source .venv/bin/activate
 pip install -e '.[dev]'
 pytest
 ruff check .
-ruff format .
+ruff format --check .   # what build.sh runs; drop --check to reformat
 mypy
 ```
 

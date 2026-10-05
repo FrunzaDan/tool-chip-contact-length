@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/FrunzaDan/Tool-Chip_Contact_Length"
+Repository = "https://github.com/FrunzaDan/tool-chip-contact-length"
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "mypy"]
